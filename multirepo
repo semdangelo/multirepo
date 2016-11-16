@@ -53,13 +53,23 @@ def main(argv):
 			url = project.attrib['url']
 			path = project.attrib['path']
 			branch = project.attrib['branch']
-			if os.path.isdir(path):
+
+            proj_repo_name = os.path.basename(os.path.normpath(url))
+            cloned_proj_path = path + proj_repo_name
+            original_folder = os.getcwd()
+			runcmd("cd '%s'" % (cloned_proj_path), cwd=path)
+
+			if os.path.isdir(cloned_proj_path):
+
 				message = "Pulling latest changes for '%s'" % (url)
 				runcmd("git checkout '%s'" % (branch), cwd=path, msg=message)
 				runcmd("git pull", cwd=path)
+
 			else:
+
 				message = "Cloning '%s'" % (url)
-				runcmd("git clone -b '%s' '%s' '%s'" % (branch, url, path), msg=message)
+				runcmd("git clone -b '%s' '%s' '%s'" % (branch, url), msg=message)
+
 		except RuntimeError as e:
 			printerr(str(e))
 			return 1
