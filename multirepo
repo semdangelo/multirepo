@@ -64,7 +64,7 @@ def optionalAttributeRead(manifest, field):
     try:
         to_retun = manifest.attrib[field]
     except Exception as e:
-        printmsg("Field '%s' is optional, default value will be used")
+        printmsg("Field '%s' is optional, default value will be used" % field)
     return to_retun
 
 def cloneOrPullProject(project):
@@ -81,7 +81,7 @@ def cloneOrPullProject(project):
 
     # the default path to execute operations onto is the cwd (which is the folder where this script's executed).
     path = os.getcwd()
-
+    printmsg('getcwd returned: ' + path)
     # eventually handle the path parameter
     if received_path is not None and received_path.startswith('/') :
         # in this scenario the path is relative
@@ -101,7 +101,7 @@ def cloneOrPullProject(project):
     else:
         repo_name = os.path.basename(os.path.normpath(url))
         cloned_repo_path += repo_name
-
+    printmsg('path : ' + cloned_repo_path)
     if os.path.exists(cloned_repo_path):
         message = "Pulling latest changes for '%s'" % (url)
         runcmd("git checkout '%s'" % (branch), cwd=os.path.realpath(cloned_repo_path), msg=message)
