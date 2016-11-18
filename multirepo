@@ -50,24 +50,72 @@ def main(argv):
 
     for project in projects:
         try:
-            url = project.attrib['url']
-            path = os.getcwd() + '/'+ project.attrib['path']
-            branch = project.attrib['branch']
-            repo_name = os.path.basename(os.path.normpath(url))
-
-            if os.path.exists(path + repo_name):
-                message = "Pulling latest changes for '%s'" % (url)
-                runcmd("git checkout '%s'" % (branch), cwd=os.path.realpath(path), msg=message)
-                runcmd("git pull", cwd=path)
-            else:
-                message = "Cloning '%s'" % (url)
-                runcmd("git clone -b '%s' '%s' " % (branch, url), cwd=path, msg=message)
+            cloneOrPullProject(project)
         except RuntimeError as e:
             printerr(str(e))
             return 1
 
     printmsg("Done!")
     return 0
+
+
+def optionalAttributeRead(manifest, field):
+    to_retun = None
+    try:
+        to_retun = manifest.attrib[field]
+    except Exception as e:
+        printmsg("Field '%s' is optional, default value will be used")
+    return to_retun
+
+def cloneOrPullProject(project):
+    # mandatory, this will throw a RuntimeException
+    url = project.attrib['url'] # mandatory
+    # optional
+    branch = optionalAttributeRead(project, 'branch')
+    received_path = optionalAttributeRead(project, 'path')
+    renamed = optionalAttributeRead(project, 'rename')
+
+    # of course the default branch is master
+    if branch is None:
+        branch = 'master'
+
+    # the default path to execute operations onto is the cwd (which is the folder where this script's executed).
+    path = os.getcwd()
+
+    # eventually handle the path parameter
+    if received_path is not None and received_path.startswith('/') :
+        # in this scenario the path is relative
+        path += '/' + received_path
+
+    if received_path is not None and not received_path.startswith('/') :
+        # in this scenario the path is absolute
+        path = received_path
+
+    # create the folder if needed
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    cloned_repo_path = path
+    if renamed is not None:
+        cloned_repo_path += renamed
+    else:
+        repo_name = os.path.basename(os.path.normpath(url))
+        cloned_repo_path += repo_name
+
+    if os.path.exists(cloned_repo_path):
+        message = "Pulling latest changes for '%s'" % (url)
+        runcmd("git checkout '%s'" % (branch), cwd=os.path.realpath(cloned_repo_path), msg=message)
+        runcmd("git pull", cwd=os.path.realpath(cloned_repo_path))
+    else:
+        message = "Cloning '%s'" % (url)
+        command_to_invoke = "git clone -b '%s' '%s' " % (branch, url)
+
+        # in this scenario, we whant to rename the root folder of the (local) repository into received value.
+        if renamed is not None :
+            command_to_invoke += renamed
+
+        runcmd(command_to_invoke, cwd=path, msg=message)
+
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv))

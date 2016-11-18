@@ -11,16 +11,16 @@ Configuration
 multirepo uses a manifest XML file, which enumerates the repos to manage. For each repo, you MUST provide thw following properties:
 
 * a `url` in form of a GIT url, to clone the repo from
-* a `branch` to checkout
-* a `path`, relative to the current directory, to clone the repo into
-
+* a `branch` to checkout.
+* a `path`, relative to the current directory, to clone the repo into. 
+* a `rename`, that will be used instead of the repository's root folder (which is the default behaviour).
 Here is an example:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest>
-	<project url="git@server:git/project1" branch="master" path="proj1" />
-	<project url="git@server:git/project2" branch="mybranch" path="proj2" />
+	<project url="git@server:git/project1" branch="master" path="../folder1" rename="folder2" />
+	<project url="git@server:git/project2" branch="mybranch"/>
 </manifest>
 ```
 
@@ -34,8 +34,9 @@ The manifest file MUST comply to the following DTD schema file:
 <!ELEMENT project EMPTY>
 <!ATTLIST project
     xmlns CDATA #FIXED ''
-    branch  #REQUIRED
-    path  #REQUIRED
+    branch  #IMPLIED
+    path  #IMPLIED
+    rename  #IMPLIED
     url CDATA #REQUIRED>
 ```
 
@@ -56,7 +57,7 @@ Installation
 On OSX, install it via [Homebrew][2] tap:
 
 ```sh
-brew tap venator85/multirepo https://github.com/venator85/multirepo/
+brew tap semdangelo/multirepo https://github.com/semdangelo/multirepo/
 brew install multirepo
 ```
 
