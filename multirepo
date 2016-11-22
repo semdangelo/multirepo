@@ -6,66 +6,117 @@ import subprocess
 import os
 
 colors = {'none': '\033[0m',
-	'black': '\033[0;30m',		'bold_black': '\033[1;30m',
-	'red': '\033[0;31m',		'bold_red': '\033[1;31m',
-	'green': '\033[0;32m',		'bold_green': '\033[1;32m',
-	'yellow': '\033[0;33m',		'bold_yellow': '\033[1;33m',
-	'blue': '\033[0;34m',		'bold_blue': '\033[1;34m',
-	'magenta': '\033[0;35m',	'bold_magenta': '\033[1;35m',
-	'cyan': '\033[0;36m',		'bold_cyan': '\033[1;36m',
-	'white': '\033[0;37m',		'bold_white': '\033[1;37m'}
+          'black': '\033[0;30m',		'bold_black': '\033[1;30m',
+          'red': '\033[0;31m',		'bold_red': '\033[1;31m',
+          'green': '\033[0;32m',		'bold_green': '\033[1;32m',
+          'yellow': '\033[0;33m',		'bold_yellow': '\033[1;33m',
+          'blue': '\033[0;34m',		'bold_blue': '\033[1;34m',
+          'magenta': '\033[0;35m',	'bold_magenta': '\033[1;35m',
+          'cyan': '\033[0;36m',		'bold_cyan': '\033[1;36m',
+          'white': '\033[0;37m',		'bold_white': '\033[1;37m'}
 
 # Run a command synchronously, sending stdout and stderr to shell
 def runcmd(cmd, cwd=None, msg=None):
-	if msg != None:
-		printmsg("%s" % (msg))
-	printcmd(cmd)
-	pipe = subprocess.Popen(cmd, shell=True, cwd=cwd, stdout=None, stderr=None)
-	pipe.communicate()	# wait for process to terminate
-	retcode = pipe.returncode
-	if retcode != 0:
-		raise RuntimeError("Command '%s' failed with return code %d" % (cmd, retcode))
+    if msg != None:
+        printmsg("%s on folder: %s" % (msg, cwd))
+    printcmd(cmd)
+    pipe = subprocess.Popen(cmd, shell=True, cwd=cwd, stdout=None, stderr=None)
+    pipe.communicate()	# wait for process to terminate
+    retcode = pipe.returncode
+    if retcode != 0:
+        raise RuntimeError("Command '%s' failed with return code %d" % (cmd, retcode))
 
 def printcmd(msg):
-	print "%s-- %s%s" % (colors['bold_black'], msg, colors['none'])
+    print "%s-- %s%s" % (colors['bold_black'], msg, colors['none'])
 
 def printmsg(msg):
-	print "%s>> %s%s" % (colors['bold_blue'], msg, colors['none'])
+    print "%s>> %s%s" % (colors['bold_blue'], msg, colors['none'])
 
 def printerr(msg):
-	print "%s!! %s%s" % (colors['bold_red'], msg, colors['none'])
+    print "%s!! %s%s" % (colors['bold_red'], msg, colors['none'])
 
 def printwarn(msg):
-	print "%s!! %s%s" % (colors['bold_yellow'], msg, colors['none'])
+    print "%s!! %s%s" % (colors['bold_yellow'], msg, colors['none'])
 
 def main(argv):
-	if len(argv) != 2:
-		printerr("Usage: multirepo <manifest-file>")
-		return 1
-	
-	tree = xml.etree.ElementTree.parse(sys.argv[1])
-	root = tree.getroot()
-	
-	projects = [node for node in root if node.tag == 'project']
-	
-	for project in projects:
-		try:
-			url = project.attrib['url']
-			path = project.attrib['path']
-			branch = project.attrib['branch']
-			if os.path.isdir(path):
-				message = "Pulling latest changes for '%s'" % (url)
-				runcmd("git checkout '%s'" % (branch), cwd=path, msg=message)
-				runcmd("git pull", cwd=path)
-			else:
-				message = "Cloning '%s'" % (url)
-				runcmd("git clone -b '%s' '%s' '%s'" % (branch, url, path), msg=message)
-		except RuntimeError as e:
-			printerr(str(e))
-			return 1
-		
-	printmsg("Done!")
-	return 0
-	
+    if len(argv) != 2:
+        printerr("Usage: multirepo <manifest-file>")
+        return 1
+
+    tree = xml.etree.ElementTree.parse(sys.argv[1])
+    root = tree.getroot()
+
+    projects = [node for node in root if node.tag == 'project']
+
+    for project in projects:
+        try:
+            cloneOrPullProject(project)
+        except RuntimeError as e:
+            printerr(str(e))
+            return 1
+
+    printmsg("Done!")
+    return 0
+
+
+def optionalAttributeRead(manifest, field):
+    to_retun = None
+    try:
+        to_retun = manifest.attrib[field]
+    except Exception as e:
+        printmsg("Field '%s' is optional, default value will be used" % field)
+    return to_retun
+
+def cloneOrPullProject(project):
+    # mandatory, this will throw a RuntimeException
+    url = project.attrib['url'] # mandatory
+    # optional
+    branch = optionalAttributeRead(project, 'branch')
+    received_path = optionalAttributeRead(project, 'path')
+    renamed = optionalAttributeRead(project, 'rename')
+
+    # of course the default branch is master
+    if branch is None:
+        branch = 'master'
+
+    # the default path to execute operations onto is the cwd (which is the folder where this script's executed).
+    path = os.getcwd()
+    # eventually handle the path parameter
+    if received_path is not None and received_path.startswith('/'):
+        # in this scenario the path is relative
+        path += '/' + received_path
+
+    if received_path is not None and not received_path.startswith('/'):
+        # in this scenario the path is absolute
+        path = received_path
+
+    # create the folder if needed
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    cloned_repo_path = path
+    if not cloned_repo_path.endswith('/'):
+        cloned_repo_path += '/'
+
+    if renamed is not None:
+        cloned_repo_path += renamed
+    else:
+        repo_name = os.path.basename(os.path.normpath(url))
+        cloned_repo_path += repo_name
+    if os.path.exists(cloned_repo_path):
+        message = "Pulling latest changes for '%s'" % (url)
+        runcmd("git checkout '%s'" % (branch), cwd=os.path.realpath(cloned_repo_path), msg=message)
+        runcmd("git pull", cwd=os.path.realpath(cloned_repo_path))
+    else:
+        message = "Cloning '%s'" % (url)
+        command_to_invoke = "git clone -b '%s' '%s' " % (branch, url)
+
+        # in this scenario, we whant to rename the root folder of the (local) repository into received value.
+        if renamed is not None:
+            command_to_invoke += renamed
+
+        runcmd(command_to_invoke, cwd=path, msg=message)
+
+
 if __name__ == '__main__':
-	sys.exit(main(sys.argv))
+    sys.exit(main(sys.argv))
